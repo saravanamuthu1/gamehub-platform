@@ -1,0 +1,47 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: [frontend, services/api-gateway, services/game-metadata]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: contains(matrix.service, 'services/')
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        if: matrix.service == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          if [ -f "${{ matrix.service }}/requirements.txt" ]; then
+            pip install -r ${{ matrix.service }}/requirements.txt
+          elif [ -f "${{ matrix.service }}/package.json" ]; then
+            cd ${{ matrix.service }} && npm ci
+          fi
+
+      - name: Run tests
+        run: |
+          if [ -f "${{ matrix.service }}/pytest.ini" ]; then
+            pytest ${{ matrix.service }}
+          elif [ -f "${{ matrix.service }}/package.json" ]; then
+            cd ${{ matrix.service }} && npm test --if-present
+          fi
